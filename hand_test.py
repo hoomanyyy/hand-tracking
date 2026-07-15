@@ -21,6 +21,8 @@ print("Model loaded!")
 
 cap = cv2.VideoCapture(0)
 
+clicked = False
+
 while True:
 
     ret, frame = cap.read()
@@ -63,7 +65,7 @@ while True:
                     -1
                 )
 
-                if i == 8:   # نوک انگشت اشاره
+                if i == 8:
 
                     screen_width, screen_height = pyautogui.size()
 
@@ -71,6 +73,19 @@ while True:
                     mouse_y = int(point.y * screen_height)
 
                     pyautogui.moveTo(mouse_x, mouse_y)
+
+                thumb = hand[4]
+                index = hand[8]
+
+                if abs(thumb.x - index.x) < 0.03 and abs(thumb.y -index.y) < 0.03:
+
+                    if clicked == False:
+                        
+                        clicked == True
+                        pyautogui.click()
+
+                else:
+                    clicked == False
 
     cv2.imshow("camera", frame)
 
