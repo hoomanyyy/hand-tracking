@@ -81,7 +81,7 @@ while True:
 
                     if clicked == False:
                         
-                        clicked == True
+                        clicked = True
                         pyautogui.click()
 
                 else:
