@@ -1,58 +1,124 @@
-import cv2
 import mediapipe as mp
-import pyautogui
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
+import numpy as np
+import cv2
+import time
+import mouse
 
+model_path = './hand_landmarker.task'
 
-base_options = python.BaseOptions(
-    model_asset_path="hand_landmarker.task"
+BaseOptions = mp.tasks.BaseOptions
+GestureRecognizer = mp.tasks.vision.GestureRecognizer
+GestureRecognizerOptions = mp.tasks.vision.GestureRecognizerOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
+
+    # Create a gesture recognizer instance with the video mode:
+options = GestureRecognizerOptions(
+    base_options=BaseOptions(model_asset_path='gesture_recognizer.task'),
+    running_mode=VisionRunningMode.VIDEO
 )
 
-options = vision.HandLandmarkerOptions(
-    base_options=base_options,
-    num_hands=1
-)
+recognizer = GestureRecognizer.create_from_options(options)
 
-detector = vision.HandLandmarker.create_from_options(options)
+mp_hands = mp.tasks.vision.HandLandmarksConnections
+mp_drawing = mp.tasks.vision.drawing_utils
+mp_drawing_styles = mp.tasks.vision.drawing_styles
 
-print("Model loaded!")
+MARGIN = 10  # pixels
+FONT_SIZE = 1
+FONT_THICKNESS = 1
+HANDEDNESS_TEXT_COLOR = (88, 205, 54)
 
+def draw_landmarks_on_image(rgb_image, detection_result):
+  hand_landmarks_list = detection_result.hand_landmarks
+  handedness_list = detection_result.handedness
+  annotated_image = np.copy(rgb_image)
 
-cap = cv2.VideoCapture(0)
+  for idx in range(len(hand_landmarks_list)):
+    hand_landmarks = hand_landmarks_list[idx]
+    handedness = handedness_list[idx]
 
-clicked = False
+    mp_drawing.draw_landmarks(
+      annotated_image,
+      hand_landmarks,
+      mp_hands.HAND_CONNECTIONS,
+      mp_drawing_styles.get_default_hand_landmarks_style(),
+      mp_drawing_styles.get_default_hand_connections_style())
+
+    height, width, _ = annotated_image.shape
+    x_coordinates = [landmark.x for landmark in hand_landmarks]
+    y_coordinates = [landmark.y for landmark in hand_landmarks]
+    text_x = int(min(x_coordinates) * width)
+    text_y = int(min(y_coordinates) * height) - MARGIN
+
+    cv2.putText(annotated_image, f"{handedness[0].category_name}",
+                (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX,
+                FONT_SIZE, HANDEDNESS_TEXT_COLOR, FONT_THICKNESS, cv2.LINE_AA)
+
+  return annotated_image
+
+cam = cv2.VideoCapture(0)
+
+frame_width = int(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+out = cv2.VideoWriter('output.mp4', fourcc, 20.0, (frame_width, frame_height))
+
 
 while True:
-
-    ret, frame = cap.read()
-
-    if not ret:
-        break
-
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    ret, frame = cam.read()
 
 
-    mp_image = mp.Image(
+    rgb_frame = cv2.cvtColor(frame , cv2.COLOR_BGR2RGB)
+
+    image = mp.Image(
         image_format=mp.ImageFormat.SRGB,
-        data=rgb
+        data=rgb_frame
     )
 
+    timestamp = int(time.time() * 1000)
+    result = recognizer.recognize_for_video(image, timestamp)
+    
+    screen_w = 1920
+    screen_h = 1080
 
-    result = detector.detect(mp_image)
+    if result.gestures:
+        print(result.gestures[0][0].category_name)
+        gesture = result.gestures[0][0].category_name
 
+        if gesture == "Closed_Fist":
+           print("close hand")
+           mouse.click("left")
+        
+        if gesture == "Open_Palm":
+           hand = result.hand_landmarks[0]
 
-    if result.hand_landmarks:
+           x = hand[0].x
+           y = hand[0].y
 
-        for hand in result.hand_landmarks:
+           mouse_x = int(x * screen_w)
+           mouse_y = int(y * screen_h)
 
-            for i, point in enumerate(hand):
+           mouse.move(mouse_x , mouse_y , absolute=True)
+        
+        if gesture == "Pointing_Up":
+           mouse.scroll(-5)
 
-                h, w, _ = frame.shape
+            
+    output_image = draw_landmarks_on_image(rgb_frame , result)
 
-                x = int(point.x * w)
-                y = int(point.y * h)
+    cv2.imshow('Camera', output_image)
 
+<<<<<<< HEAD
+    if cv2.waitKey(1) == ord('q'):
+        break
+
+cam.release()
+out.release()
+cv2.destroyAllWindows()
+=======
                 print(
                     f"ID: {i} X:{x} Y:{y}"
                 )
@@ -96,3 +162,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+>>>>>>> a150409b4c1c4624f012f0351547d6931c59d873
